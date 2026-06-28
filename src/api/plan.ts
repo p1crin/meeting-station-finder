@@ -15,7 +15,9 @@ type PlanResponse = {
  * GET /api/v1/plan — fastest route for one (from → to) pair, normalized to the
  * three numbers we actually use.
  *
- * - 422 means "same endpoint" (the person is already at this hub) → 0 secs.
+ * - 422 `samePlace` means the person is already at this hub → 0 secs.
+ *   Any other 422 (e.g. `searchWindowTooDense` from an unroutable origin such
+ *   as an airline-feed airport node) means no usable route → null.
  * - 404 or an empty `journeys` array means no route → null.
  * - Otherwise pick the journey with the smallest `durationSecs`.
  */
@@ -37,9 +39,12 @@ export async function planDuration(
     signal,
   );
 
-  // Same start/end point → this person is already here.
+  // 422 only means "already here" when the code is `samePlace`; other 422
+  // causes (e.g. an unroutable airline-feed origin) are treated as no route.
   if (res.status === 422) {
-    return { durationSecs: 0, transferCount: 0, fareIc: 0 };
+    return res.errorCode === "samePlace"
+      ? { durationSecs: 0, transferCount: 0, fareIc: 0 }
+      : { durationSecs: null, transferCount: null, fareIc: null };
   }
 
   const journeys = res.data?.journeys ?? [];

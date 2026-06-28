@@ -10,6 +10,7 @@ export type ApiResponse<T> = {
   status: number;
   ok: boolean;
   data: T | null;
+  errorCode: string | null; // `error.code` from the API envelope on failures
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -19,8 +20,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *
  * - Funnels every call through the shared concurrency limiter.
  * - Retries at most once on network failure / 5xx, with a short backoff.
- * - Never throws on 4xx: returns the status so callers can branch (e.g. 422 =
- *   same endpoint, 404 = not found).
+ * - Never throws on 4xx: returns the status and the API's `error.code` so
+ *   callers can branch (e.g. 422 `samePlace` vs `searchWindowTooDense`).
  */
 export function apiGet<T>(
   path: string,
@@ -42,8 +43,23 @@ export function apiGet<T>(
           await sleep(400);
           continue;
         }
-        const data = res.ok ? ((await res.json()) as T) : null;
-        return { status: res.status, ok: res.ok, data };
+        if (res.ok) {
+          return {
+            status: res.status,
+            ok: true,
+            data: (await res.json()) as T,
+            errorCode: null,
+          };
+        }
+        // Non-OK: read the API error envelope for its code, if any.
+        let errorCode: string | null = null;
+        try {
+          const body = (await res.json()) as { error?: { code?: string } };
+          errorCode = body?.error?.code ?? null;
+        } catch {
+          // non-JSON error body — leave errorCode null
+        }
+        return { status: res.status, ok: false, data: null, errorCode };
       } catch (err) {
         if ((err as Error)?.name === "AbortError") throw err;
         lastErr = err;

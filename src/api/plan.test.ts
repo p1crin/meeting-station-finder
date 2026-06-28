@@ -14,8 +14,12 @@ const conditions: SearchConditions = {
 };
 const req = { from: "feed:A", to: "geo:35.6,139.7", conditions };
 
-function reply<T>(status: number, data: T | null): ApiResponse<T> {
-  return { status, ok: status >= 200 && status < 300, data };
+function reply<T>(
+  status: number,
+  data: T | null,
+  errorCode: string | null = null,
+): ApiResponse<T> {
+  return { status, ok: status >= 200 && status < 300, data, errorCode };
 }
 
 beforeEach(() => mockGet.mockReset());
@@ -44,10 +48,16 @@ describe("planDuration", () => {
     expect(r.fareIc).toBe(200);
   });
 
-  it("treats a 422 same-endpoint response as 0 seconds", async () => {
-    mockGet.mockResolvedValue(reply(422, null));
+  it("treats a 422 `samePlace` response as 0 seconds", async () => {
+    mockGet.mockResolvedValue(reply(422, null, "samePlace"));
     const r = await planDuration(req);
     expect(r).toEqual({ durationSecs: 0, transferCount: 0, fareIc: 0 });
+  });
+
+  it("treats a non-samePlace 422 (e.g. searchWindowTooDense) as no route", async () => {
+    mockGet.mockResolvedValue(reply(422, null, "searchWindowTooDense"));
+    const r = await planDuration(req);
+    expect(r.durationSecs).toBeNull();
   });
 
   it("returns null on an empty journeys array (no route)", async () => {

@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-limestone text-ink font-sans antialiased;
+  }
+  /* Editorial caption voice: Space Grotesk, letter-spaced, uppercase. */
+  .label-caps {
+    @apply font-grotesk uppercase tracking-caps text-slate;
+    font-size: 0.75rem;
+  }
+}
